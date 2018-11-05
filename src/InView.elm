@@ -1,29 +1,28 @@
 module InView exposing
-    ( init
-    , subscriptions
-    , update
-    , updateViewportOffset
-    , addElements
+    ( check
+    , checkWithOffset
+    , checkAlt
+    , checkAltWithOffset
     , State
     , Msg
-    , inView
-    , inViewWithOffset
-    , inViewAlt
-    , inViewAltWithOffset
-    , CenterDistance
-    , centerDistance
+    , init
+    , update
+    , updateViewportOffset
+    , subscriptions
+    , addElements
     )
 
 {-|
 
 
-# Init & Update
+# Detect
 
-@docs init
-@docs subscriptions
-@docs update
-@docs updateViewportOffset
-@docs addElements
+Detect if an element is visible in the current viewport.
+
+@docs check
+@docs checkWithOffset
+@docs checkAlt
+@docs checkAltWithOffset
 
 
 # Definitions
@@ -32,18 +31,17 @@ module InView exposing
 @docs Msg
 
 
-# Detect
+# Init
 
-@docs inView
-@docs inViewWithOffset
-@docs inViewAlt
-@docs inViewAltWithOffset
+@docs init
 
 
-# CenterDistance
+# Update
 
-@docs CenterDistance
-@docs centerDistance
+@docs update
+@docs updateViewportOffset
+@docs subscriptions
+@docs addElements
 
 -}
 
@@ -73,7 +71,7 @@ type alias Viewport =
     }
 
 
-{-| Keeps track of viewport position, viewport dimensions and element positions
+{-| Keeps track of viewport position, viewport dimensions and element positions.
 -}
 type State
     = State
@@ -82,7 +80,7 @@ type State
         }
 
 
-{-| Takes the list of element ids you want to keep track of
+{-| Takes the list of element ids you want to keep track of.
 -}
 init : List String -> ( State, Cmd Msg )
 init elementIds =
@@ -97,7 +95,7 @@ init elementIds =
     )
 
 
-{-| Add elements you'd like to be able to detect
+{-| Add elements you'd like to be able to detect after you've initialized the state.
 -}
 addElements : List String -> Cmd Msg
 addElements elementIds =
@@ -115,7 +113,7 @@ getPosition id =
 -- SUBSCRIPTIONS
 
 
-{-| Subscribes to browser resize events and recalculates element positions
+{-| Subscribes to browser resize events and recalculates element positions.
 -}
 subscriptions : State -> Sub Msg
 subscriptions state =
@@ -126,14 +124,16 @@ subscriptions state =
 -- UPDATE
 
 
-{-| -}
+{-| A message type for the state to update.
+-}
 type Msg
     = GotViewport (Result () Dom.Viewport)
     | GotElementPosition String (Result Dom.Error Dom.Element)
     | OnBrowserResize Int Int
 
 
-{-| -}
+{-| Update viewport size and element positions.
+-}
 update : Msg -> State -> ( State, Cmd Msg )
 update msg (State ({ viewport } as state)) =
     case msg of
@@ -170,7 +170,8 @@ update msg (State ({ viewport } as state)) =
             )
 
 
-{-| Update current viewport offset
+{-| Update current viewport x and y offset. Use this function to update the viewport
+scroll position.
 -}
 updateViewportOffset : Float -> Float -> State -> State
 updateViewportOffset x y (State ({ viewport } as state)) =
@@ -181,24 +182,24 @@ updateViewportOffset x y (State ({ viewport } as state)) =
 -- DETECT
 
 
-{-| True if the element is in the current viewport
+{-| True if the element is in the current viewport.
 
-![inView](https://rl-king.github.io/elm-inview-example/illustrations/inView.svg)
+![check](https://rl-king.github.io/elm-inview-example/illustrations/inView.svg)
 
 -}
-inView : String -> State -> Maybe Bool
-inView id state =
-    inViewWithOffset id 0 0 state
+check : String -> State -> Maybe Bool
+check id state =
+    checkWithOffset id 0 0 state
 
 
 {-| True if the element is in the current viewport but with an x and y offset.
 A positive offset will make the viewport smaller and vice versa.
 
-![inViewWithOffset](https://rl-king.github.io/elm-inview-example/illustrations/inViewWithOffset.svg)
+![checkWithOffset](https://rl-king.github.io/elm-inview-example/illustrations/inViewWithOffset.svg)
 
 -}
-inViewWithOffset : String -> Float -> Float -> State -> Maybe Bool
-inViewWithOffset id offsetX offsetY (State { elements, viewport }) =
+checkWithOffset : String -> Float -> Float -> State -> Maybe Bool
+checkWithOffset id offsetX offsetY (State { elements, viewport }) =
     let
         calc element =
             (viewport.y + offsetY < element.y + element.height)
@@ -209,24 +210,24 @@ inViewWithOffset id offsetX offsetY (State { elements, viewport }) =
     Maybe.map calc (Dict.get id elements)
 
 
-{-| True if the element is in _or_ above the current viewport
+{-| True if the element is in _or_ above the current viewport.
 
-![inViewAlt](https://rl-king.github.io/elm-inview-example/illustrations/inViewAlt.svg)
+![checkAlt](https://rl-king.github.io/elm-inview-example/illustrations/inViewAlt.svg)
 
 -}
-inViewAlt : String -> State -> Maybe Bool
-inViewAlt id state =
-    inViewAltWithOffset id 0 0 state
+checkAlt : String -> State -> Maybe Bool
+checkAlt id state =
+    checkAltWithOffset id 0 0 state
 
 
 {-| True if the element is in _or_ above the current viewport but with an x and y offset.
 A positive offset will make the viewport smaller and vice versa.
 
-![inViewAltWithOffset](https://rl-king.github.io/elm-inview-example/illustrations/inViewAltWithOffset.svg)
+![checkAltWithOffset](https://rl-king.github.io/elm-inview-example/illustrations/inViewAltWithOffset.svg)
 
 -}
-inViewAltWithOffset : String -> Float -> Float -> State -> Maybe Bool
-inViewAltWithOffset id offsetX offsetY (State { elements, viewport }) =
+checkAltWithOffset : String -> Float -> Float -> State -> Maybe Bool
+checkAltWithOffset id offsetX offsetY (State { elements, viewport }) =
     let
         calc element =
             (viewport.y - offsetY + viewport.height > element.y)
@@ -237,31 +238,27 @@ inViewAltWithOffset id offsetX offsetY (State { elements, viewport }) =
 
 
 -- DISTANCE
-
-
-{-| The distance of the element's center to viewport center in px
--}
-type alias CenterDistance =
-    { x : Float
-    , y : Float
-    }
-
-
-{-| CenterDistance from viewport center.
-
-Useful for creating positional effects relative to the viewport
-
--}
-centerDistance : String -> State -> Maybe CenterDistance
-centerDistance id (State { elements, viewport }) =
-    let
-        calc element =
-            { x =
-                (element.x + element.width / 2)
-                    - (viewport.x + viewport.width / 2)
-            , y =
-                (element.y + element.height / 2)
-                    - (viewport.y + viewport.height / 2)
-            }
-    in
-    Maybe.map calc (Dict.get id elements)
+-- {-| The distance of the element's center to viewport center in px.
+-- -}
+-- type alias CenterDistance =
+--     { x : Float
+--     , y : Float
+--     }
+-- {-| Distance from the center of the viewport, where the `x` value is relative to
+-- the vertical center and `y` to the horizontal.
+-- Useful for creating positional effects relative to the viewport
+-- ![centerDistance](https://rl-king.github.io/elm-inview-example/illustrations/centerDistance.svg)
+-- -}
+-- centerDistance : String -> State -> Maybe CenterDistance
+-- centerDistance id (State { elements, viewport }) =
+--     let
+--         calc element =
+--             { x =
+--                 (element.x + element.width / 2)
+--                     - (viewport.x + viewport.width / 2)
+--             , y =
+--                 (element.y + element.height / 2)
+--                     - (viewport.y + viewport.height / 2)
+--             }
+--     in
+--     Maybe.map calc (Dict.get id elements)
