@@ -3,12 +3,14 @@ module InView exposing
     , subscriptions
     , update
     , updateViewportOffset
+    , addElements
     , State
     , Msg
     , inView
+    , inViewWithOffset
     , inViewAlt
     , inViewAltWithOffset
-    , inViewWithOffset
+    , CenterDistance
     , getCenterDistance
     )
 
@@ -21,6 +23,7 @@ module InView exposing
 @docs subscriptions
 @docs update
 @docs updateViewportOffset
+@docs addElements
 
 
 # Definitions
@@ -32,9 +35,11 @@ module InView exposing
 # Detect
 
 @docs inView
+@docs inViewWithOffset
 @docs inViewAlt
 @docs inViewAltWithOffset
-@docs inViewWithOffset
+
+@docs CenterDistance
 @docs getCenterDistance
 
 -}
@@ -65,7 +70,16 @@ type alias Viewport =
     }
 
 
-{-| -}
+{-| Element center to viewport center distance in px
+-}
+type alias CenterDistance =
+    { x : Float
+    , y : Float
+    }
+
+
+{-| Keeps track of viewport dimensions and element positions
+-}
 type State
     = State
         { elements : Dict String Element
@@ -73,22 +87,27 @@ type State
         }
 
 
-{-| -}
+{-| Takes the list of elements you want to keep track of
+-}
 init : List String -> ( State, Cmd Msg )
 init elementIds =
     ( State
         { elements = Dict.empty
-        , viewport =
-            { x = 0
-            , y = 0
-            , width = 0
-            , height = 0
-            }
+        , viewport = Viewport 0 0 0 0
         }
-    , Cmd.batch <|
-        Task.attempt GotViewport Dom.getViewport
-            :: List.map getPosition elementIds
+    , Cmd.batch
+        [ Task.attempt GotViewport Dom.getViewport
+        , addElements elementIds
+        ]
     )
+
+
+{-| Add elements you'd like to be able to detect
+-}
+addElements : List String -> Cmd Msg
+addElements elementIds =
+    Cmd.batch <|
+        List.map getPosition elementIds
 
 
 getPosition : String -> Cmd Msg
@@ -101,7 +120,8 @@ getPosition id =
 -- SUBSCRIPTIONS
 
 
-{-| -}
+{-| Subscribes to browser resize events and recalculates element positions
+-}
 subscriptions : State -> Sub Msg
 subscriptions state =
     Browser.Events.onResize OnBrowserResize
@@ -119,23 +139,31 @@ type Msg
 
 
 {-| -}
-update : Msg -> State -> State
+update : Msg -> State -> ( State, Cmd Msg )
 update msg (State ({ viewport } as state)) =
-    State <|
-        case msg of
-            GotViewport (Ok vp) ->
-                { state | viewport = vp.viewport }
+    case msg of
+        GotViewport (Ok vp) ->
+            ( State { state | viewport = vp.viewport }, Cmd.none )
 
-            GotViewport (Err err) ->
-                state
+        GotViewport (Err err) ->
+            ( State state, Cmd.none )
 
-            GotElementPosition id (Ok { element }) ->
-                { state | elements = Dict.insert id element state.elements }
+        GotElementPosition id (Ok { element }) ->
+            ( State
+                { state
+                    | elements =
+                        Dict.insert id element state.elements
+                }
+            , Cmd.none
+            )
 
-            GotElementPosition id (Err err) ->
-                state
+        GotElementPosition id (Err err) ->
+            ( State { state | elements = Dict.remove id state.elements }
+            , Cmd.none
+            )
 
-            OnBrowserResize width height ->
+        OnBrowserResize width height ->
+            ( State
                 { state
                     | viewport =
                         { viewport
@@ -143,9 +171,12 @@ update msg (State ({ viewport } as state)) =
                             , height = toFloat height
                         }
                 }
+            , addElements (Dict.keys state.elements)
+            )
 
 
-{-| -}
+{-| Update current viewport offset
+-}
 updateViewportOffset : Float -> Float -> State -> State
 updateViewportOffset x y (State ({ viewport } as state)) =
     State { state | viewport = { viewport | x = x, y = y } }
@@ -155,52 +186,75 @@ updateViewportOffset x y (State ({ viewport } as state)) =
 -- INVIEW
 
 
-{-| -}
-inView : String -> State -> Bool
+{-| True if the element is in the current viewport
+
+![inView](https://raw.github.com/rl-king/elm-inview/master/illustrations/inView.svg)
+
+-}
+inView : String -> State -> Maybe Bool
 inView id state =
-    inViewWithOffset id 0 state
+    inViewWithOffset id 0 0 state
 
 
-{-| -}
-inViewWithOffset : String -> Float -> State -> Bool
-inViewWithOffset id offset (State { elements, viewport }) =
-    case Dict.get id elements of
-        Just element ->
-            (viewport.y + offset < element.y + element.height)
-                && (viewport.y + viewport.height - offset > element.y)
-                && (viewport.x + offset < element.x + element.width)
-                && (viewport.x + viewport.width - offset > element.x)
+{-| True if the element is in the current viewport but with an x and y offset.
+A positive offset will make the viewport smaller and a negative bigger.
 
-        Nothing ->
-            False
+![inViewWithOffset](https://raw.github.com/rl-king/elm-inview/master/illustrations/inViewWithOffset.svg)
+
+-}
+inViewWithOffset : String -> Float -> Float -> State -> Maybe Bool
+inViewWithOffset id offsetX offsetY (State { elements, viewport }) =
+    let
+        calc element =
+            (viewport.y + offsetY < element.y + element.height)
+                && (viewport.y + viewport.height - offsetY > element.y)
+                && (viewport.x + offsetX < element.x + element.width)
+                && (viewport.x + viewport.width - offsetX > element.x)
+    in
+    Maybe.map calc (Dict.get id elements)
 
 
-{-| -}
-inViewAlt : String -> State -> Bool
+{-| True if the element is in or above the current viewport
+
+![inViewAlt](https://raw.github.com/rl-king/elm-inview/master/illustrations/inViewAlt.svg)
+
+-}
+inViewAlt : String -> State -> Maybe Bool
 inViewAlt id state =
     inViewAltWithOffset id 0 state
 
 
-{-| -}
-inViewAltWithOffset : String -> Float -> State -> Bool
+{-| True if the element is in or above the current viewport but with an x and y offset
+A positive offset will make the viewport smaller and a negative bigger.
+
+![inViewAltWithOffset](https://raw.github.com/rl-king/elm-inview/master/illustrations/inViewAltWithOffset.svg)
+
+-}
+inViewAltWithOffset : String -> Float -> State -> Maybe Bool
 inViewAltWithOffset id offset (State { elements, viewport }) =
-    case Dict.get id elements of
-        Just element ->
+    let
+        calc element =
             (viewport.y - offset + viewport.height > element.y)
                 && (viewport.x - offset + viewport.width > element.x)
+    in
+    Maybe.map calc (Dict.get id elements)
 
-        Nothing ->
-            False
 
+{-| Distance from viewport center.
 
-{-| -}
-getCenterDistance : String -> State -> Maybe Float
+Useful for creating positional effects relative to the viewport
+
+-}
+getCenterDistance : String -> State -> Maybe CenterDistance
 getCenterDistance id (State { elements, viewport }) =
-    case Dict.get id elements of
-        Just element ->
-            Just <|
+    let
+        calc element =
+            { x =
+                (element.x + element.width / 2)
+                    - (viewport.x + viewport.width / 2)
+            , y =
                 (element.y + element.height / 2)
                     - (viewport.y + viewport.height / 2)
-
-        Nothing ->
-            Nothing
+            }
+    in
+    Maybe.map calc (Dict.get id elements)

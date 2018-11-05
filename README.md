@@ -1,6 +1,8 @@
 # elm-inview
 Detect if an element is in the viewport
 
+<img src="https://raw.github.com/rl-king/elm-inview/master/illustrations/All.svg">
+
 Since there is currently no way of listening to scroll events in Elm you'll have to hookup a port. Below is the bit of JS that gets you the scroll position and an example on how to set it all up.
 
 ### JS
@@ -19,7 +21,7 @@ init : flags -> ( Model, Cmd Msg )
 init _ =
     let
         ( inViewModel, inViewCmds ) =
-            InView.init itemIds
+            InView.init ["1", "2", "3", "4", "5"]
     in
     ( { inView = inViewModel }
     , Cmd.map InViewMsg inViewCmds
@@ -27,12 +29,12 @@ init _ =
 
 
 subscriptions : Model -> Sub Msg
-   subscriptions model =
-       Sub.batch
-           [ Sub.map InViewMsg <|
-               InView.subscriptions model.inView
-           , onScroll OnScroll
-           ]
+subscriptions model =
+    Sub.batch
+       [ Sub.map InViewMsg <|
+           InView.subscriptions model.inView
+       , onScroll OnScroll
+       ]
 
 
 type Msg
