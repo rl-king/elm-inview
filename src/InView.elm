@@ -188,7 +188,7 @@ updateViewportOffset x y (State ({ viewport } as state)) =
 
 {-| True if the element is in the current viewport
 
-![inView](https://raw.github.com/rl-king/elm-inview/master/illustrations/inView.svg)
+![inView](https://rl-king.github.io/elm-inview-example/illustrations/inView.svg)
 
 -}
 inView : String -> State -> Maybe Bool
@@ -197,9 +197,9 @@ inView id state =
 
 
 {-| True if the element is in the current viewport but with an x and y offset.
-A positive offset will make the viewport smaller and a negative bigger.
+A positive offset will make the viewport smaller and vice versa.
 
-![inViewWithOffset](https://raw.github.com/rl-king/elm-inview/master/illustrations/inViewWithOffset.svg)
+![inViewWithOffset](https://rl-king.github.io/elm-inview-example/illustrations/inViewWithOffset.svg)
 
 -}
 inViewWithOffset : String -> Float -> Float -> State -> Maybe Bool
@@ -214,9 +214,9 @@ inViewWithOffset id offsetX offsetY (State { elements, viewport }) =
     Maybe.map calc (Dict.get id elements)
 
 
-{-| True if the element is in or above the current viewport
+{-| True if the element is in _or_ above the current viewport
 
-![inViewAlt](https://raw.github.com/rl-king/elm-inview/master/illustrations/inViewAlt.svg)
+![inViewAlt](https://rl-king.github.io/elm-inview-example/illustrations/inViewAlt.svg)
 
 -}
 inViewAlt : String -> State -> Maybe Bool
@@ -224,10 +224,10 @@ inViewAlt id state =
     inViewAltWithOffset id 0 state
 
 
-{-| True if the element is in or above the current viewport but with an x and y offset
-A positive offset will make the viewport smaller and a negative bigger.
+{-| True if the element is in _or_ above the current viewport but with an x and y offset.
+A positive offset will make the viewport smaller and vice versa.
 
-![inViewAltWithOffset](https://raw.github.com/rl-king/elm-inview/master/illustrations/inViewAltWithOffset.svg)
+![inViewAltWithOffset](https://rl-king.github.io/elm-inview-example/illustrations/inViewAltWithOffset.svg)
 
 -}
 inViewAltWithOffset : String -> Float -> State -> Maybe Bool

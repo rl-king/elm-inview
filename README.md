@@ -1,7 +1,10 @@
 # elm-inview
-Detect if an element is in the viewport
+Detect if an element is in the current viewport
 
-<img src="https://raw.github.com/rl-king/elm-inview/master/illustrations/All.svg">
+[example live](https://rl-king.github.io/elm-inview-example/) |
+[example code](https://github.com/rl-king/elm-inview-example)
+
+<img src="https://rl-king.github.io/elm-inview-example/illustrations/All.svg">
 
 Since there is currently no way of listening to scroll events in Elm you'll have to hookup a port. Below is the bit of JS that gets you the scroll position and an example on how to set it all up.
 
