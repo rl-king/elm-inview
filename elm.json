@@ -1,7 +1,7 @@
 {
     "type": "package",
     "name": "rl-king/elm-inview",
-    "summary": "Detect if an element is in the viewport",
+    "summary": "Detect if an element is in the current viewport",
     "license": "BSD-3-Clause",
     "version": "1.0.0",
     "exposed-modules": [

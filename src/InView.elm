@@ -11,7 +11,7 @@ module InView exposing
     , inViewAlt
     , inViewAltWithOffset
     , CenterDistance
-    , getCenterDistance
+    , centerDistance
     )
 
 {-|
@@ -39,8 +39,11 @@ module InView exposing
 @docs inViewAlt
 @docs inViewAltWithOffset
 
+
+# CenterDistance
+
 @docs CenterDistance
-@docs getCenterDistance
+@docs centerDistance
 
 -}
 
@@ -70,15 +73,7 @@ type alias Viewport =
     }
 
 
-{-| Element center to viewport center distance in px
--}
-type alias CenterDistance =
-    { x : Float
-    , y : Float
-    }
-
-
-{-| Keeps track of viewport dimensions and element positions
+{-| Keeps track of viewport position, viewport dimensions and element positions
 -}
 type State
     = State
@@ -87,7 +82,7 @@ type State
         }
 
 
-{-| Takes the list of elements you want to keep track of
+{-| Takes the list of element ids you want to keep track of
 -}
 init : List String -> ( State, Cmd Msg )
 init elementIds =
@@ -183,7 +178,7 @@ updateViewportOffset x y (State ({ viewport } as state)) =
 
 
 
--- INVIEW
+-- DETECT
 
 
 {-| True if the element is in the current viewport
@@ -221,7 +216,7 @@ inViewWithOffset id offsetX offsetY (State { elements, viewport }) =
 -}
 inViewAlt : String -> State -> Maybe Bool
 inViewAlt id state =
-    inViewAltWithOffset id 0 state
+    inViewAltWithOffset id 0 0 state
 
 
 {-| True if the element is in _or_ above the current viewport but with an x and y offset.
@@ -230,23 +225,35 @@ A positive offset will make the viewport smaller and vice versa.
 ![inViewAltWithOffset](https://rl-king.github.io/elm-inview-example/illustrations/inViewAltWithOffset.svg)
 
 -}
-inViewAltWithOffset : String -> Float -> State -> Maybe Bool
-inViewAltWithOffset id offset (State { elements, viewport }) =
+inViewAltWithOffset : String -> Float -> Float -> State -> Maybe Bool
+inViewAltWithOffset id offsetX offsetY (State { elements, viewport }) =
     let
         calc element =
-            (viewport.y - offset + viewport.height > element.y)
-                && (viewport.x - offset + viewport.width > element.x)
+            (viewport.y - offsetY + viewport.height > element.y)
+                && (viewport.x - offsetX + viewport.width > element.x)
     in
     Maybe.map calc (Dict.get id elements)
 
 
-{-| Distance from viewport center.
+
+-- DISTANCE
+
+
+{-| The distance of the element's center to viewport center in px
+-}
+type alias CenterDistance =
+    { x : Float
+    , y : Float
+    }
+
+
+{-| CenterDistance from viewport center.
 
 Useful for creating positional effects relative to the viewport
 
 -}
-getCenterDistance : String -> State -> Maybe CenterDistance
-getCenterDistance id (State { elements, viewport }) =
+centerDistance : String -> State -> Maybe CenterDistance
+centerDistance id (State { elements, viewport }) =
     let
         calc element =
             { x =
