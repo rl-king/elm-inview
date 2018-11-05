@@ -9,6 +9,7 @@ Detect if an element is in the current viewport
 Since there is currently no way of listening to scroll events in Elm you'll have to hookup a port. Below is the bit of JS that gets you the scroll position and an example on how to set it all up.
 
 ### JS
+You might want to throttle or debounce this, listening to scroll events and getting positional information can cause some performance issues.
 ```js
 window.addEventListener("scroll", () => {
     app.ports.onScroll.send([window.scrollX, window.scrollY]);
