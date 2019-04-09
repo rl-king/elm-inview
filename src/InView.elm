@@ -80,7 +80,8 @@ type State
         }
 
 
-{-| Takes the list of element ids you want to keep track of.
+{-| Takes the list of element ids you want to keep track of and attempts to find them
+in the DOM.
 -}
 init : List String -> ( State, Cmd Msg )
 init elementIds =
@@ -182,7 +183,9 @@ updateViewportOffset x y (State ({ viewport } as state)) =
 -- DETECT
 
 
-{-| True if the element is in the current viewport.
+{-| True if the element with the given id is in the current viewport.
+
+_note: this is a Maybe because the element might not be on the page at all._
 
 ![check](https://rl-king.github.io/elm-inview-example/illustrations/inView.svg)
 
@@ -192,8 +195,10 @@ check id state =
     checkWithOffset id 0 0 state
 
 
-{-| True if the element is in the current viewport but with an x and y offset.
+{-| True if the element with the given id is in the current viewport but with an x and y offset.
 A positive offset will make the viewport smaller and vice versa.
+
+_note: this is a Maybe because the element might not be on the page at all._
 
 ![checkWithOffset](https://rl-king.github.io/elm-inview-example/illustrations/inViewWithOffset.svg)
 
@@ -210,7 +215,9 @@ checkWithOffset id offsetX offsetY (State { elements, viewport }) =
     Maybe.map calc (Dict.get id elements)
 
 
-{-| True if the element is in _or_ above the current viewport.
+{-| True if the element with the given id is in _or_ above the current viewport.
+
+_note: this is a Maybe because the element might not be on the page at all._
 
 ![checkAlt](https://rl-king.github.io/elm-inview-example/illustrations/inViewAlt.svg)
 
@@ -220,8 +227,10 @@ checkAlt id state =
     checkAltWithOffset id 0 0 state
 
 
-{-| True if the element is in _or_ above the current viewport but with an x and y offset.
+{-| True if the element with the given id is in _or_ above the current viewport but with an x and y offset.
 A positive offset will make the viewport smaller and vice versa.
+
+_note: this is a Maybe because the element might not be on the page at all._
 
 ![checkAltWithOffset](https://rl-king.github.io/elm-inview-example/illustrations/inViewAltWithOffset.svg)
 
