@@ -3,6 +3,7 @@ module InView exposing
     , checkWithOffset
     , checkAlt
     , checkAltWithOffset
+    , checkCustom
     , State
     , Msg
     , init
@@ -25,6 +26,11 @@ Detect if an element is visible in the current viewport.
 @docs checkAltWithOffset
 
 
+# Detect Custom
+
+@docs checkCustom
+
+
 # Definitions
 
 @docs State
@@ -45,30 +51,10 @@ Detect if an element is visible in the current viewport.
 
 -}
 
-import Browser.Dom as Dom
+import Browser.Dom exposing (Element, Viewport)
 import Browser.Events
 import Dict exposing (Dict)
 import Task
-
-
-
--- DEFINITIONS
-
-
-type alias Element =
-    { x : Float
-    , y : Float
-    , width : Float
-    , height : Float
-    }
-
-
-type alias Viewport =
-    { x : Float
-    , y : Float
-    , width : Float
-    , height : Float
-    }
 
 
 {-| Keeps track of viewport position, viewport dimensions and element positions.
@@ -87,10 +73,13 @@ init : List String -> ( State, Cmd Msg )
 init elementIds =
     ( State
         { elements = Dict.empty
-        , viewport = Viewport 0 0 0 0
+        , viewport =
+            { scene = { width = 0, height = 0 }
+            , viewport = { x = 0, y = 0, width = 0, height = 0 }
+            }
         }
     , Cmd.batch
-        [ Task.attempt GotViewport Dom.getViewport
+        [ Task.attempt GotViewport Browser.Dom.getViewport
         , addElements elementIds
         ]
     )
@@ -107,7 +96,7 @@ addElements elementIds =
 getPosition : String -> Cmd Msg
 getPosition id =
     Task.attempt (GotElementPosition id) <|
-        Dom.getElement id
+        Browser.Dom.getElement id
 
 
 
@@ -128,23 +117,23 @@ subscriptions state =
 {-| A message type for the state to update.
 -}
 type Msg
-    = GotViewport (Result () Dom.Viewport)
-    | GotElementPosition String (Result Dom.Error Dom.Element)
+    = GotViewport (Result () Viewport)
+    | GotElementPosition String (Result Browser.Dom.Error Element)
     | OnBrowserResize Int Int
 
 
 {-| Update viewport size and element positions.
 -}
 update : Msg -> State -> ( State, Cmd Msg )
-update msg (State ({ viewport } as state)) =
+update msg (State state) =
     case msg of
-        GotViewport (Ok vp) ->
-            ( State { state | viewport = vp.viewport }, Cmd.none )
+        GotViewport (Ok viewport) ->
+            ( State { state | viewport = viewport }, Cmd.none )
 
         GotViewport (Err err) ->
             ( State state, Cmd.none )
 
-        GotElementPosition id (Ok { element }) ->
+        GotElementPosition id (Ok element) ->
             ( State
                 { state
                     | elements =
@@ -159,12 +148,22 @@ update msg (State ({ viewport } as state)) =
             )
 
         OnBrowserResize width height ->
+            let
+                viewport =
+                    state.viewport
+
+                viewportNested =
+                    viewport.viewport
+            in
             ( State
                 { state
                     | viewport =
                         { viewport
-                            | width = toFloat width
-                            , height = toFloat height
+                            | viewport =
+                                { viewportNested
+                                    | width = toFloat width
+                                    , height = toFloat height
+                                }
                         }
                 }
             , addElements (Dict.keys state.elements)
@@ -176,7 +175,15 @@ scroll position.
 -}
 updateViewportOffset : Float -> Float -> State -> State
 updateViewportOffset x y (State ({ viewport } as state)) =
-    State { state | viewport = { viewport | x = x, y = y } }
+    let
+        viewportNested =
+            viewport.viewport
+    in
+    State
+        { state
+            | viewport =
+                { viewport | viewport = { viewportNested | x = x, y = y } }
+        }
 
 
 
@@ -204,15 +211,15 @@ _note: this is a Maybe because the element might not be on the page at all._
 
 -}
 checkWithOffset : String -> Float -> Float -> State -> Maybe Bool
-checkWithOffset id offsetX offsetY (State { elements, viewport }) =
+checkWithOffset id offsetX offsetY state =
     let
-        calc element =
+        calc { viewport } { element } =
             (viewport.y + offsetY < element.y + element.height)
                 && (viewport.y + viewport.height - offsetY > element.y)
                 && (viewport.x + offsetX < element.x + element.width)
                 && (viewport.x + viewport.width - offsetX > element.x)
     in
-    Maybe.map calc (Dict.get id elements)
+    checkCustom calc id state
 
 
 {-| True if the element with the given id is in _or_ above the current viewport.
@@ -236,13 +243,34 @@ _note: this is a Maybe because the element might not be on the page at all._
 
 -}
 checkAltWithOffset : String -> Float -> Float -> State -> Maybe Bool
-checkAltWithOffset id offsetX offsetY (State { elements, viewport }) =
+checkAltWithOffset id offsetX offsetY state =
     let
-        calc element =
+        calc { viewport } { element } =
             (viewport.y - offsetY + viewport.height > element.y)
                 && (viewport.x - offsetX + viewport.width > element.x)
     in
-    Maybe.map calc (Dict.get id elements)
+    checkCustom calc id state
+
+
+{-| Write your own check function.
+
+For example `checkAltWithOffset` is implemented like:
+
+    checkAltWithOffset : String -> Float -> Float -> State -> Maybe Bool
+    checkAltWithOffset id offsetX offsetY state =
+        let
+            calc { viewport } { element } =
+                (viewport.y - offsetY + viewport.height > element.y)
+                    && viewport.x - offsetX + viewport.width > element.x)
+        in
+        checkCustom calc id state
+
+_note: this is a Maybe because the element might not be on the page at all._
+
+-}
+checkCustom : (Viewport -> Element -> Bool) -> String -> State -> Maybe Bool
+checkCustom f id (State { viewport, elements }) =
+    Maybe.map (f viewport) (Dict.get id elements)
 
 
 
