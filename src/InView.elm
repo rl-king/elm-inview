@@ -125,9 +125,9 @@ type Msg
 {-| Update viewport size and element positions.
 -}
 update : Msg -> State -> ( State, Cmd Msg )
-update msg (State ({ viewport } as state)) =
+update msg (State state) =
     case msg of
-        GotViewport (Ok vp) ->
+        GotViewport (Ok viewport) ->
             ( State { state | viewport = viewport }, Cmd.none )
 
         GotViewport (Err err) ->
@@ -149,6 +149,9 @@ update msg (State ({ viewport } as state)) =
 
         OnBrowserResize width height ->
             let
+                viewport =
+                    state.viewport
+
                 viewportNested =
                     viewport.viewport
             in
