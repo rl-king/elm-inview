@@ -10,9 +10,10 @@ Since there is currently no way of listening to scroll events in Elm you'll have
 
 ### JS
 You might want to throttle or debounce this, listening to scroll events and getting positional information can cause some performance issues.
-```js
+```javascript
 window.addEventListener("scroll", function() {
-    app.ports.onScroll.send([window.pageXOffset, window.pageYOffset]);
+    var offset = [window.pageXOffset, window.pageYOffset];
+    app.ports.onScroll.send(offset);
 }, { passive: true });
 ```
 
