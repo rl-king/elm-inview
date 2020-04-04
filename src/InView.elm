@@ -254,7 +254,7 @@ checkAltWithOffset id offsetX offsetY state =
 
 {-| Write your own check function.
 
-For example `checkWithOffset` is implemented like:
+For example `checkAltWithOffset` is implemented like:
 
     checkAltWithOffset : String -> Float -> Float -> State -> Maybe Bool
     checkAltWithOffset id offsetX offsetY state =
