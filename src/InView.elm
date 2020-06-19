@@ -63,39 +63,43 @@ type State
     = State
         { elements : Dict String Element
         , viewport : Viewport
+        , maxX : Float
+        , maxY : Float
         }
 
 
 {-| Takes the list of element ids you want to keep track of and attempts to find them
 in the DOM.
 -}
-init : List String -> ( State, Cmd Msg )
-init elementIds =
+init : (Msg -> msg) -> List String -> ( State, Cmd msg )
+init lift elementIds =
     ( State
         { elements = Dict.empty
         , viewport =
             { scene = { width = 0, height = 0 }
             , viewport = { x = 0, y = 0, width = 0, height = 0 }
             }
+        , maxX = 0
+        , maxY = 0
         }
     , Cmd.batch
-        [ Task.attempt GotViewport Browser.Dom.getViewport
-        , addElements elementIds
+        [ Task.attempt (lift << GotViewport) Browser.Dom.getViewport
+        , addElements lift elementIds
         ]
     )
 
 
 {-| Add elements you'd like to be able to detect after you've initialized the state.
 -}
-addElements : List String -> Cmd Msg
-addElements elementIds =
+addElements : (Msg -> msg) -> List String -> Cmd msg
+addElements lift elementIds =
     Cmd.batch <|
-        List.map getPosition elementIds
+        List.map (getPosition lift) elementIds
 
 
-getPosition : String -> Cmd Msg
-getPosition id =
-    Task.attempt (GotElementPosition id) <|
+getPosition : (Msg -> msg) -> String -> Cmd msg
+getPosition lift id =
+    Task.attempt (lift << GotElementPosition id) <|
         Browser.Dom.getElement id
 
 
@@ -105,9 +109,9 @@ getPosition id =
 
 {-| Subscribes to browser resize events and recalculates element positions.
 -}
-subscriptions : State -> Sub Msg
-subscriptions state =
-    Browser.Events.onResize OnBrowserResize
+subscriptions : (Msg -> msg) -> State -> Sub msg
+subscriptions lift state =
+    Browser.Events.onResize (\a b -> lift (OnBrowserResize a b))
 
 
 
@@ -124,11 +128,18 @@ type Msg
 
 {-| Update viewport size and element positions.
 -}
-update : Msg -> State -> ( State, Cmd Msg )
-update msg (State state) =
+update : (Msg -> msg) -> Msg -> State -> ( State, Cmd msg )
+update lift msg (State state) =
     case msg of
         GotViewport (Ok viewport) ->
-            ( State { state | viewport = viewport }, Cmd.none )
+            ( State
+                { state
+                    | viewport = viewport
+                    , maxX = max viewport.viewport.x state.maxX
+                    , maxY = max viewport.viewport.y state.maxY
+                }
+            , Cmd.none
+            )
 
         GotViewport (Err err) ->
             ( State state, Cmd.none )
@@ -166,7 +177,7 @@ update msg (State state) =
                                 }
                         }
                 }
-            , addElements (Dict.keys state.elements)
+            , addElements lift (Dict.keys state.elements)
             )
 
 
@@ -182,7 +193,11 @@ updateViewportOffset x y (State ({ viewport } as state)) =
     State
         { state
             | viewport =
-                { viewport | viewport = { viewportNested | x = x, y = y } }
+                { viewport
+                    | viewport = { viewportNested | x = x, y = y }
+                }
+            , maxX = max viewport.viewport.x x
+            , maxY = max viewport.viewport.y y
         }
 
 
@@ -268,7 +283,7 @@ For example `checkAltWithOffset` is implemented like:
 _note: this is a Maybe because the element might not be on the page at all._
 
 -}
-checkCustom : (Viewport -> Element -> Bool) -> String -> State -> Maybe Bool
+checkCustom : (Viewport -> Element -> a) -> String -> State -> Maybe a
 checkCustom f id (State { viewport, elements }) =
     Maybe.map (f viewport) (Dict.get id elements)
 
