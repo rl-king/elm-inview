@@ -51,7 +51,7 @@ Detect if an element is visible in the current viewport.
 
 -}
 
-import Browser.Dom exposing (Element, Viewport)
+import Browser.Dom
 import Browser.Events
 import Dict exposing (Dict)
 import Task
@@ -63,9 +63,31 @@ type State
     = State
         { elements : Dict String Element
         , viewport : Viewport
+        }
+
+
+type alias Viewport =
+    { scene :
+        { width : Float
+        , height : Float
+        }
+    , viewport :
+        { x : Float
+        , y : Float
         , maxX : Float
         , maxY : Float
+        , width : Float
+        , height : Float
         }
+    }
+
+
+type alias Element =
+    { x : Float
+    , y : Float
+    , width : Float
+    , height : Float
+    }
 
 
 {-| Takes the list of element ids you want to keep track of and attempts to find them
@@ -77,10 +99,8 @@ init lift elementIds =
         { elements = Dict.empty
         , viewport =
             { scene = { width = 0, height = 0 }
-            , viewport = { x = 0, y = 0, width = 0, height = 0 }
+            , viewport = { x = 0, y = 0, maxX = 0, maxY = 0, width = 0, height = 0 }
             }
-        , maxX = 0
-        , maxY = 0
         }
     , Cmd.batch
         [ Task.attempt (lift << GotViewport) Browser.Dom.getViewport
@@ -121,30 +141,25 @@ subscriptions lift state =
 {-| A message type for the state to update.
 -}
 type Msg
-    = GotViewport (Result () Viewport)
-    | GotElementPosition String (Result Browser.Dom.Error Element)
+    = GotViewport (Result () Browser.Dom.Viewport)
+    | GotElementPosition String (Result Browser.Dom.Error Browser.Dom.Element)
     | OnBrowserResize Int Int
 
 
 {-| Update viewport size and element positions.
 -}
 update : (Msg -> msg) -> Msg -> State -> ( State, Cmd msg )
-update lift msg (State state) =
+update lift msg ((State state) as state_) =
     case msg of
         GotViewport (Ok viewport) ->
-            ( State
-                { state
-                    | viewport = viewport
-                    , maxX = max viewport.viewport.x state.maxX
-                    , maxY = max viewport.viewport.y state.maxY
-                }
+            ( State { state | viewport = fromViewport viewport state_ }
             , Cmd.none
             )
 
         GotViewport (Err err) ->
             ( State state, Cmd.none )
 
-        GotElementPosition id (Ok element) ->
+        GotElementPosition id (Ok { element }) ->
             ( State
                 { state
                     | elements =
@@ -181,24 +196,45 @@ update lift msg (State state) =
             )
 
 
+fromViewport : Browser.Dom.Viewport -> State -> Viewport
+fromViewport { viewport, scene } (State state) =
+    { scene =
+        { width = scene.width
+        , height = scene.height
+        }
+    , viewport =
+        { x = viewport.x
+        , y = viewport.y
+        , maxX = Basics.max viewport.x state.viewport.viewport.maxX
+        , maxY = Basics.max viewport.y state.viewport.viewport.maxY
+        , width = viewport.width
+        , height = viewport.height
+        }
+    }
+
+
 {-| Update current viewport x and y offset. Use this function to update the viewport
 scroll position.
 -}
 updateViewportOffset : Float -> Float -> State -> State
 updateViewportOffset x y (State ({ viewport } as state)) =
     let
-        viewportNested =
-            viewport.viewport
-    in
-    State
-        { state
-            | viewport =
-                { viewport
-                    | viewport = { viewportNested | x = x, y = y }
+        newViewport =
+            { scene =
+                { width = viewport.scene.width
+                , height = viewport.scene.height
                 }
-            , maxX = max viewport.viewport.x x
-            , maxY = max viewport.viewport.y y
-        }
+            , viewport =
+                { x = x
+                , y = y
+                , maxX = Basics.max x viewport.viewport.maxX
+                , maxY = Basics.max y viewport.viewport.maxY
+                , width = viewport.viewport.width
+                , height = viewport.viewport.height
+                }
+            }
+    in
+    State { state | viewport = newViewport }
 
 
 
@@ -207,7 +243,7 @@ updateViewportOffset x y (State ({ viewport } as state)) =
 
 {-| True if the element with the given id is in the current viewport.
 
-_note: this is a Maybe because the element might not be on the page at all._
+_note: The result is a Maybe because the element might not be on the page at all._
 
 ![check](https://rl-king.github.io/elm-inview-example/illustrations/inView.svg)
 
@@ -220,7 +256,7 @@ check id state =
 {-| True if the element with the given id is in the current viewport but with an x and y offset.
 A positive offset will make the viewport smaller and vice versa.
 
-_note: this is a Maybe because the element might not be on the page at all._
+_note: The result is a Maybe because the element might not be on the page at all._
 
 ![checkWithOffset](https://rl-king.github.io/elm-inview-example/illustrations/inViewWithOffset.svg)
 
@@ -228,18 +264,18 @@ _note: this is a Maybe because the element might not be on the page at all._
 checkWithOffset : String -> Float -> Float -> State -> Maybe Bool
 checkWithOffset id offsetX offsetY state =
     let
-        calc { viewport } { element } =
+        calc { viewport } element =
             (viewport.y + offsetY < element.y + element.height)
                 && (viewport.y + viewport.height - offsetY > element.y)
                 && (viewport.x + offsetX < element.x + element.width)
                 && (viewport.x + viewport.width - offsetX > element.x)
     in
-    checkCustom calc id state
+    checkCustom (\a b -> Maybe.map (calc a) b) id state
 
 
 {-| True if the element with the given id is in _or_ above the current viewport.
 
-_note: this is a Maybe because the element might not be on the page at all._
+_note: The result is a Maybe because the element might not be on the page at all._
 
 ![checkAlt](https://rl-king.github.io/elm-inview-example/illustrations/inViewAlt.svg)
 
@@ -252,7 +288,7 @@ checkAlt id state =
 {-| True if the element with the given id is in _or_ above the current viewport but with an x and y offset.
 A positive offset will make the viewport smaller and vice versa.
 
-_note: this is a Maybe because the element might not be on the page at all._
+_note: The result is a Maybe because the element might not be on the page at all._
 
 ![checkAltWithOffset](https://rl-king.github.io/elm-inview-example/illustrations/inViewAltWithOffset.svg)
 
@@ -260,11 +296,11 @@ _note: this is a Maybe because the element might not be on the page at all._
 checkAltWithOffset : String -> Float -> Float -> State -> Maybe Bool
 checkAltWithOffset id offsetX offsetY state =
     let
-        calc { viewport } { element } =
+        calc { viewport } element =
             (viewport.y - offsetY + viewport.height > element.y)
                 && (viewport.x - offsetX + viewport.width > element.x)
     in
-    checkCustom calc id state
+    checkCustom (\a b -> Maybe.map (calc a) b) id state
 
 
 {-| Write your own check function.
@@ -280,37 +316,9 @@ For example `checkAltWithOffset` is implemented like:
         in
         checkCustom calc id state
 
-_note: this is a Maybe because the element might not be on the page at all._
+_note: Element is a Maybe because the element might not be on the page at all._
 
 -}
-checkCustom : (Viewport -> Element -> a) -> String -> State -> Maybe a
+checkCustom : (Viewport -> Maybe Element -> a) -> String -> State -> a
 checkCustom f id (State { viewport, elements }) =
-    Maybe.map (f viewport) (Dict.get id elements)
-
-
-
--- DISTANCE
--- {-| The distance of the element's center to viewport center in px.
--- -}
--- type alias CenterDistance =
---     { x : Float
---     , y : Float
---     }
--- {-| Distance from the center of the viewport, where the `x` value is relative to
--- the vertical center and `y` to the horizontal.
--- Useful for creating positional effects relative to the viewport
--- ![centerDistance](https://rl-king.github.io/elm-inview-example/illustrations/centerDistance.svg)
--- -}
--- centerDistance : String -> State -> Maybe CenterDistance
--- centerDistance id (State { elements, viewport }) =
---     let
---         calc element =
---             { x =
---                 (element.x + element.width / 2)
---                     - (viewport.x + viewport.width / 2)
---             , y =
---                 (element.y + element.height / 2)
---                     - (viewport.y + viewport.height / 2)
---             }
---     in
---     Maybe.map calc (Dict.get id elements)
+    f viewport (Dict.get id elements)
