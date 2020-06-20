@@ -219,11 +219,7 @@ update lift msg ((State state) as state_) =
                     { state
                         | viewport =
                             { viewport
-                                | viewport =
-                                    { viewportNested
-                                        | width = toFloat width
-                                        , height = toFloat height
-                                    }
+                                | viewport = { viewportNested | width = toFloat width, height = toFloat height }
                             }
                     }
                 , addElements lift (Dict.keys state.elements)
@@ -299,7 +295,7 @@ isInOrAboveView id state =
 
 
 
--- PADDING
+-- MARGIN
 
 
 {-| -}
@@ -352,8 +348,8 @@ isInOrAboveViewWithMargin : String -> Margin -> State -> Maybe Bool
 isInOrAboveViewWithMargin id margin state =
     let
         calc { viewport } element =
-            (viewport.y - margin.top + viewport.height > element.y)
-                && (viewport.x - margin.left + viewport.width > element.x)
+            (viewport.y - margin.bottom + viewport.height > element.y)
+                && (viewport.x - margin.right + viewport.width > element.x)
     in
     custom (\a b -> Maybe.map (calc a) b) id state
 
@@ -366,8 +362,8 @@ For example `isInOrAboveViewWithMargin` is implemented like:
     isInOrAboveViewWithMargin id margin state =
         let
             calc { viewport } element =
-                (viewport.y - margin.top + viewport.height > element.y)
-                    && (viewport.x - margin.left + viewport.width > element.x)
+                (viewport.y - margin.bottom + viewport.height > element.y)
+                    && (viewport.x - margin.right + viewport.width > element.x)
         in
         custom (\a b -> Maybe.map (calc a) b) id state
 
