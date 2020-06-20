@@ -1,40 +1,29 @@
 module InView exposing
-    ( check
-    , checkWithOffset
-    , checkAlt
-    , checkAltWithOffset
-    , checkCustom
-    , State
-    , Msg
+    ( State
+    , Viewport
+    , Element
     , init
+    , Msg
     , update
     , updateViewportOffset
     , subscriptions
     , addElements
+    , isInView
+    , isInOrAboveView
+    , Margin
+    , isInViewWithMargin
+    , isInOrAboveViewWithMargin
+    , custom
     )
 
-{-|
-
-
-# Detect
-
-Detect if an element is visible in the current viewport.
-
-@docs check
-@docs checkWithOffset
-@docs checkAlt
-@docs checkAltWithOffset
-
-
-# Detect Custom
-
-@docs checkCustom
+{-| Detect if an element is visible in the current viewport.
 
 
 # Definitions
 
 @docs State
-@docs Msg
+@docs Viewport
+@docs Element
 
 
 # Init
@@ -44,10 +33,29 @@ Detect if an element is visible in the current viewport.
 
 # Update
 
+@docs Msg
 @docs update
 @docs updateViewportOffset
 @docs subscriptions
 @docs addElements
+
+
+# Check
+
+@docs isInView
+@docs isInOrAboveView
+
+
+# Check with margin
+
+@docs Margin
+@docs isInViewWithMargin
+@docs isInOrAboveViewWithMargin
+
+
+# Custom check
+
+@docs custom
 
 -}
 
@@ -72,6 +80,8 @@ type Key
     = Key Int
 
 
+{-| Similar to Browser.Dom.Viewport with the addition of `maxX` and `maxY`.
+-}
 type alias Viewport =
     { scene :
         { width : Float
@@ -88,6 +98,8 @@ type alias Viewport =
     }
 
 
+{-| Similar to Browser.Dom.Element without scene and viewport.
+-}
 type alias Element =
     { x : Float
     , y : Float
@@ -96,8 +108,8 @@ type alias Element =
     }
 
 
-{-| Takes the list of element ids you want to keep track of and attempts to find them
-in the DOM.
+{-| Takes a list of element ids you want to track and attempts to find them
+on the current page.
 -}
 init : (Msg -> msg) -> List String -> ( State, Cmd msg )
 init lift elementIds =
@@ -116,7 +128,7 @@ init lift elementIds =
     )
 
 
-{-| Add elements you'd like to be able to detect after you've initialized the state.
+{-| Track more elements after you've initialized the state.
 -}
 addElements : (Msg -> msg) -> List String -> Cmd msg
 addElements lift elementIds =
@@ -134,7 +146,7 @@ getPosition lift id =
 -- SUBSCRIPTIONS
 
 
-{-| Subscribes to browser resize events and recalculates element positions.
+{-| Subscribe to browser resize events to recalculate element positions.
 -}
 subscriptions : (Msg -> msg) -> State -> Sub msg
 subscriptions lift state =
@@ -235,11 +247,10 @@ fromViewport { viewport, scene } (State state) =
     }
 
 
-{-| Update current viewport x and y offset. Use this function to update the viewport
-scroll position.
+{-| Update current viewport `x` and `y` offset.
 -}
-updateViewportOffset : Float -> Float -> State -> State
-updateViewportOffset x y (State ({ viewport } as state)) =
+updateViewportOffset : { x : Float, y : Float } -> State -> State
+updateViewportOffset { x, y } (State ({ viewport } as state)) =
     let
         newViewport =
             { scene =
@@ -270,29 +281,9 @@ _note: The result is a Maybe because the element might not be on the page at all
 ![check](https://rl-king.github.io/elm-inview-example/illustrations/inView.svg)
 
 -}
-check : String -> State -> Maybe Bool
-check id state =
-    checkWithOffset id 0 0 state
-
-
-{-| True if the element with the given id is in the current viewport but with an x and y offset.
-A positive offset will make the viewport smaller and vice versa.
-
-_note: The result is a Maybe because the element might not be on the page at all._
-
-![checkWithOffset](https://rl-king.github.io/elm-inview-example/illustrations/inViewWithOffset.svg)
-
--}
-checkWithOffset : String -> Float -> Float -> State -> Maybe Bool
-checkWithOffset id offsetX offsetY state =
-    let
-        calc { viewport } element =
-            (viewport.y + offsetY < element.y + element.height)
-                && (viewport.y + viewport.height - offsetY > element.y)
-                && (viewport.x + offsetX < element.x + element.width)
-                && (viewport.x + viewport.width - offsetX > element.x)
-    in
-    checkCustom (\a b -> Maybe.map (calc a) b) id state
+isInView : String -> State -> Maybe Bool
+isInView id state =
+    isInViewWithMargin id noMargin state
 
 
 {-| True if the element with the given id is in _or_ above the current viewport.
@@ -302,45 +293,87 @@ _note: The result is a Maybe because the element might not be on the page at all
 ![checkAlt](https://rl-king.github.io/elm-inview-example/illustrations/inViewAlt.svg)
 
 -}
-checkAlt : String -> State -> Maybe Bool
-checkAlt id state =
-    checkAltWithOffset id 0 0 state
+isInOrAboveView : String -> State -> Maybe Bool
+isInOrAboveView id state =
+    isInOrAboveViewWithMargin id noMargin state
 
 
-{-| True if the element with the given id is in _or_ above the current viewport but with an x and y offset.
+
+-- PADDING
+
+
+{-| -}
+type alias Margin =
+    { top : Float
+    , right : Float
+    , bottom : Float
+    , left : Float
+    }
+
+
+noMargin : Margin
+noMargin =
+    { top = 0
+    , right = 0
+    , bottom = 0
+    , left = 0
+    }
+
+
+{-| True if the element with the given id is in the current viewport but with an offset.
 A positive offset will make the viewport smaller and vice versa.
 
 _note: The result is a Maybe because the element might not be on the page at all._
 
-![checkAltWithOffset](https://rl-king.github.io/elm-inview-example/illustrations/inViewAltWithOffset.svg)
+![isInViewWithMargin](https://rl-king.github.io/elm-inview-example/illustrations/inViewWithOffset.svg)
 
 -}
-checkAltWithOffset : String -> Float -> Float -> State -> Maybe Bool
-checkAltWithOffset id offsetX offsetY state =
+isInViewWithMargin : String -> Margin -> State -> Maybe Bool
+isInViewWithMargin id margin state =
     let
         calc { viewport } element =
-            (viewport.y - offsetY + viewport.height > element.y)
-                && (viewport.x - offsetX + viewport.width > element.x)
+            (viewport.y + margin.top < element.y + element.height)
+                && (viewport.y + viewport.height - margin.bottom > element.y)
+                && (viewport.x + margin.left < element.x + element.width)
+                && (viewport.x + viewport.width - margin.right > element.x)
     in
-    checkCustom (\a b -> Maybe.map (calc a) b) id state
+    custom (\a b -> Maybe.map (calc a) b) id state
+
+
+{-| True if the element with the given id is in _or_ above the current viewport but an offset.
+A positive offset will make the viewport smaller and vice versa.
+
+_note: The result is a Maybe because the element might not be on the page at all._
+
+![isInOrAboveViewWithMargin](https://rl-king.github.io/elm-inview-example/illustrations/inViewAltWithOffset.svg)
+
+-}
+isInOrAboveViewWithMargin : String -> Margin -> State -> Maybe Bool
+isInOrAboveViewWithMargin id margin state =
+    let
+        calc { viewport } element =
+            (viewport.y - margin.top + viewport.height > element.y)
+                && (viewport.x - margin.left + viewport.width > element.x)
+    in
+    custom (\a b -> Maybe.map (calc a) b) id state
 
 
 {-| Write your own check function.
 
-For example `checkAltWithOffset` is implemented like:
+For example `isInOrAboveViewWithMargin` is implemented like:
 
-    checkAltWithOffset : String -> Float -> Float -> State -> Maybe Bool
-    checkAltWithOffset id offsetX offsetY state =
+    isInOrAboveViewWithMargin : String -> Margin -> State -> Maybe Bool
+    isInOrAboveViewWithMargin id margin state =
         let
-            calc { viewport } { element } =
-                (viewport.y - offsetY + viewport.height > element.y)
-                    && viewport.x - offsetX + viewport.width > element.x)
+            calc { viewport } element =
+                (viewport.y - margin.top + viewport.height > element.y)
+                    && (viewport.x - margin.left + viewport.width > element.x)
         in
-        checkCustom calc id state
+        custom (\a b -> Maybe.map (calc a) b) id state
 
 _note: Element is a Maybe because the element might not be on the page at all._
 
 -}
-checkCustom : (Viewport -> Maybe Element -> a) -> String -> State -> a
-checkCustom f id (State { viewport, elements }) =
+custom : (Viewport -> Maybe Element -> a) -> String -> State -> a
+custom f id (State { viewport, elements }) =
     f viewport (Dict.get id elements)
