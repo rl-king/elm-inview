@@ -54,6 +54,7 @@ Detect if an element is visible in the current viewport.
 import Browser.Dom
 import Browser.Events
 import Dict exposing (Dict)
+import Process
 import Task
 
 
@@ -63,7 +64,12 @@ type State
     = State
         { elements : Dict String Element
         , viewport : Viewport
+        , throttle : Key
         }
+
+
+type Key
+    = Key Int
 
 
 type alias Viewport =
@@ -101,6 +107,7 @@ init lift elementIds =
             { scene = { width = 0, height = 0 }
             , viewport = { x = 0, y = 0, maxX = 0, maxY = 0, width = 0, height = 0 }
             }
+        , throttle = Key 0
         }
     , Cmd.batch
         [ Task.attempt (lift << GotViewport) Browser.Dom.getViewport
@@ -143,6 +150,7 @@ subscriptions lift state =
 type Msg
     = GotViewport (Result () Browser.Dom.Viewport)
     | GotElementPosition String (Result Browser.Dom.Error Browser.Dom.Element)
+    | GetElements Key Int Int
     | OnBrowserResize Int Int
 
 
@@ -175,25 +183,39 @@ update lift msg ((State state) as state_) =
 
         OnBrowserResize width height ->
             let
-                viewport =
-                    state.viewport
-
-                viewportNested =
-                    viewport.viewport
+                nextKey (Key key) =
+                    Key (key + 1)
             in
-            ( State
-                { state
-                    | viewport =
-                        { viewport
-                            | viewport =
-                                { viewportNested
-                                    | width = toFloat width
-                                    , height = toFloat height
-                                }
-                        }
-                }
-            , addElements lift (Dict.keys state.elements)
+            ( State { state | throttle = nextKey state.throttle }
+            , Task.perform (\_ -> lift (GetElements (nextKey state.throttle) width height)) <|
+                Process.sleep 500
             )
+
+        GetElements key width height ->
+            if state.throttle /= key then
+                ( state_, Cmd.none )
+
+            else
+                let
+                    viewport =
+                        state.viewport
+
+                    viewportNested =
+                        viewport.viewport
+                in
+                ( State
+                    { state
+                        | viewport =
+                            { viewport
+                                | viewport =
+                                    { viewportNested
+                                        | width = toFloat width
+                                        , height = toFloat height
+                                    }
+                            }
+                    }
+                , addElements lift (Dict.keys state.elements)
+                )
 
 
 fromViewport : Browser.Dom.Viewport -> State -> Viewport
