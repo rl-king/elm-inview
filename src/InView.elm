@@ -7,7 +7,7 @@ module InView exposing
     , update
     , updateViewportOffset
     , subscriptions
-    , addElements
+    , addElement
     , isInView
     , isInOrAboveView
     , Margin
@@ -37,7 +37,7 @@ module InView exposing
 @docs update
 @docs updateViewportOffset
 @docs subscriptions
-@docs addElements
+@docs addElement
 
 
 # Check
@@ -70,14 +70,21 @@ import Task
 -}
 type State
     = State
-        { elements : Dict String Element
+        { elements : Dict String Status
         , viewport : Viewport
-        , throttle : Key
+        , onRefreshKey : Key { onRefreshKey : () }
+        , onResizeKey : Key { onResizeKey : () }
         }
 
 
-type Key
+type Key a
     = Key Int
+
+
+type Status
+    = Found Element
+    | Queued
+    | NotFound
 
 
 {-| Similar to Browser.Dom.Viewport with the addition of `maxX` and `maxY`.
@@ -119,21 +126,39 @@ init lift elementIds =
             { scene = { width = 0, height = 0 }
             , viewport = { x = 0, y = 0, maxX = 0, maxY = 0, width = 0, height = 0 }
             }
-        , throttle = Key 0
+        , onRefreshKey = Key 0
+        , onResizeKey = Key 0
         }
-    , Cmd.batch
-        [ Task.attempt (lift << GotViewport) Browser.Dom.getViewport
-        , addElements lift elementIds
-        ]
+    , Cmd.batch <|
+        List.map (getPosition lift) elementIds
     )
 
 
-{-| Track more elements after you've initialized the state.
+{-| Track element position after you've initialized the state.
+
+Use this when the page content moves around after initialization,
+like for example when images load and stuff gets pushed down.
+
 -}
-addElements : (Msg -> msg) -> List String -> Cmd msg
-addElements lift elementIds =
-    Cmd.batch <|
-        List.map (getPosition lift) elementIds
+addElement : (Msg -> msg) -> String -> State -> ( State, Cmd msg )
+addElement lift id (State state) =
+    let
+        upsert element =
+            case element of
+                Nothing ->
+                    Just Queued
+
+                Just a ->
+                    Just a
+    in
+    ( State
+        { state
+            | onRefreshKey = nextKey state.onRefreshKey
+            , elements = Dict.update id upsert state.elements
+        }
+    , Task.perform (\_ -> lift (Refresh (nextKey state.onRefreshKey))) <|
+        Process.sleep 500
+    )
 
 
 getPosition : (Msg -> msg) -> String -> Cmd msg
@@ -160,10 +185,10 @@ subscriptions lift state =
 {-| A message type for the state to update.
 -}
 type Msg
-    = GotViewport (Result () Browser.Dom.Viewport)
-    | GotElementPosition String (Result Browser.Dom.Error Browser.Dom.Element)
-    | GetElements Key Int Int
+    = GotElementPosition String (Result Browser.Dom.Error Browser.Dom.Element)
     | OnBrowserResize Int Int
+    | GetElementsOnResize (Key { onResizeKey : () }) Int Int
+    | Refresh (Key { onRefreshKey : () })
 
 
 {-| Update viewport size and element positions.
@@ -171,40 +196,28 @@ type Msg
 update : (Msg -> msg) -> Msg -> State -> ( State, Cmd msg )
 update lift msg ((State state) as state_) =
     case msg of
-        GotViewport (Ok viewport) ->
-            ( State { state | viewport = fromViewport viewport state_ }
-            , Cmd.none
-            )
-
-        GotViewport (Err err) ->
-            ( State state, Cmd.none )
-
-        GotElementPosition id (Ok { element }) ->
+        GotElementPosition id (Ok { element, viewport, scene }) ->
             ( State
                 { state
-                    | elements =
-                        Dict.insert id element state.elements
+                    | viewport = fromViewport { viewport = viewport, scene = scene } state_
+                    , elements = Dict.insert id (Found element) state.elements
                 }
             , Cmd.none
             )
 
         GotElementPosition id (Err err) ->
-            ( State { state | elements = Dict.remove id state.elements }
+            ( State { state | elements = Dict.insert id NotFound state.elements }
             , Cmd.none
             )
 
         OnBrowserResize width height ->
-            let
-                nextKey (Key key) =
-                    Key (key + 1)
-            in
-            ( State { state | throttle = nextKey state.throttle }
-            , Task.perform (\_ -> lift (GetElements (nextKey state.throttle) width height)) <|
-                Process.sleep 500
+            ( State { state | onResizeKey = nextKey state.onResizeKey }
+            , Task.perform (\_ -> lift (GetElementsOnResize (nextKey state.onResizeKey) width height)) <|
+                Process.sleep 300
             )
 
-        GetElements key width height ->
-            if state.throttle /= key then
+        GetElementsOnResize onResizeKey width height ->
+            if state.onResizeKey /= onResizeKey then
                 ( state_, Cmd.none )
 
             else
@@ -222,8 +235,24 @@ update lift msg ((State state) as state_) =
                                 | viewport = { viewportNested | width = toFloat width, height = toFloat height }
                             }
                     }
-                , addElements lift (Dict.keys state.elements)
+                , Cmd.batch <|
+                    List.map (getPosition lift) (Dict.keys state.elements)
                 )
+
+        Refresh onRefreshKey ->
+            if state.onRefreshKey /= onRefreshKey then
+                ( state_, Cmd.none )
+
+            else
+                ( state_
+                , Cmd.batch <|
+                    List.map (getPosition lift) (Dict.keys state.elements)
+                )
+
+
+nextKey : Key a -> Key a
+nextKey (Key onRefreshKey) =
+    Key (onRefreshKey + 1)
 
 
 fromViewport : Browser.Dom.Viewport -> State -> Viewport
@@ -372,4 +401,13 @@ _note: Element is a Maybe because the element might not be on the page at all._
 -}
 custom : (Viewport -> Maybe Element -> a) -> String -> State -> a
 custom f id (State { viewport, elements }) =
-    f viewport (Dict.get id elements)
+    let
+        unwrap status =
+            case status of
+                Found x ->
+                    Just x
+
+                _ ->
+                    Nothing
+    in
+    f viewport (Maybe.andThen unwrap (Dict.get id elements))
