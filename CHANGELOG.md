@@ -16,11 +16,8 @@
 * Add Margin
   * Allows for control over all edges instead of just horizonal and vertical
 
-* Remove addElements
-* Add addElement
-
-* Throttle refresh on window resize - 300ms
-* Throttle addElement - 500ms
+* Refresh on on window resize - 300ms of no change
+* Batch DOM lookup when adding more elements - 500ms of no change
 
 ## 1.1.0
 * Add checkCustom

@@ -7,7 +7,7 @@ module InView exposing
     , update
     , updateViewportOffset
     , subscriptions
-    , addElement
+    , addElements
     , isInView
     , isInOrAboveView
     , Margin
@@ -37,7 +37,7 @@ module InView exposing
 @docs update
 @docs updateViewportOffset
 @docs subscriptions
-@docs addElement
+@docs addElements
 
 
 # Check
@@ -134,14 +134,14 @@ init lift elementIds =
     )
 
 
-{-| Track element position after you've initialized the state.
+{-| Track element positions after you've initialized the state.
 
 Use this when the page content moves around after initialization,
 like for example when images load and stuff gets pushed down.
 
 -}
-addElement : (Msg -> msg) -> String -> State -> ( State, Cmd msg )
-addElement lift id (State state) =
+addElements : (Msg -> msg) -> List String -> State -> ( State, Cmd msg )
+addElements lift ids (State state) =
     let
         upsert element =
             case element of
@@ -154,7 +154,7 @@ addElement lift id (State state) =
     ( State
         { state
             | onRefreshKey = nextKey state.onRefreshKey
-            , elements = Dict.update id upsert state.elements
+            , elements = List.foldl (\id acc -> Dict.update id upsert acc) state.elements ids
         }
     , Task.perform (\_ -> lift (Refresh (nextKey state.onRefreshKey))) <|
         Process.sleep 500
@@ -251,8 +251,8 @@ update lift msg ((State state) as state_) =
 
 
 nextKey : Key a -> Key a
-nextKey (Key onRefreshKey) =
-    Key (onRefreshKey + 1)
+nextKey (Key k) =
+    Key (k + 1)
 
 
 fromViewport : Browser.Dom.Viewport -> State -> Viewport
