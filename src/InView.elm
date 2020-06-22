@@ -16,10 +16,10 @@ module InView exposing
     , custom
     )
 
-{-| Detect if an element is visible in the current viewport.
+{-| Get information on an element position relative to the current viewport.
 
 
-# Definitions
+# Definition
 
 @docs State
 @docs Viewport
@@ -88,6 +88,9 @@ type Status
 
 
 {-| Similar to Browser.Dom.Viewport with the addition of `maxX` and `maxY`.
+
+You can use `maxX` and `maxY` to check if an element has ever been in the viewport before.
+
 -}
 type alias Viewport =
     { scene :

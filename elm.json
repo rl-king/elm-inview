@@ -1,7 +1,7 @@
 {
     "type": "package",
     "name": "rl-king/elm-inview",
-    "summary": "Detect if an element is in the current viewport",
+    "summary": "Get information on an element position relative to the current viewport",
     "license": "BSD-3-Clause",
     "version": "1.1.0",
     "exposed-modules": [

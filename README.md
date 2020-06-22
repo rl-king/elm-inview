@@ -1,29 +1,19 @@
 # elm-inview
-Detect if an element is in the current viewport
+Detect if an element is in the current viewport.
 
 [example live](https://rl-king.github.io/elm-inview-example/) |
 [example code](https://github.com/rl-king/elm-inview-example)
 
 ![all](https://rl-king.github.io/elm-inview-example/illustrations/All.svg)
 
+
 Since there is currently no way of listening to scroll events in Elm you'll have to hookup a port. Below is the bit of JS that gets you the scroll position and an example on how to set it all up.
 
-## Port
-You might want to throttle or debounce this, listening to scroll events and getting positional information can cause some performance issues.
-```javascript
-window.addEventListener("scroll", function() {
-    var offset = {x: window.pageXOffset, y: window.pageYOffset};
-    app.ports.onScroll.send(offset);
-}, { passive: true });
-```
-
-
-## Elm
 ```elm
 port onScroll : ({x: Float, y: Float} -> msg) -> Sub msg
 
 
-init : flags -> ( Model, Cmd Msg )
+init : () -> ( Model, Cmd Msg )
 init _ =
     let
         ( inViewModel, inViewCmds ) =
@@ -64,3 +54,12 @@ update msg model =
             , inViewCmds
             )
 ```
+
+```javascript
+window.addEventListener("scroll", function() {
+    var offset = {x: window.pageXOffset, y: window.pageYOffset};
+    app.ports.onScroll.send(offset);
+}, { passive: true });
+```
+
+You might want to throttle or debounce this, listening to scroll events and getting positional information can cause some performance issues.

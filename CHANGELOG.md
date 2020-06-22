@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2.0.0
+* Pass `Msg -> msg` function to every that returns a `Msg`
 * Add Viewport
   * Like Browser.Dom.Viewport with max `x` and `y`
 * Add Element
@@ -16,7 +17,7 @@
 * Add Margin
   * Allows for control over all edges instead of just horizonal and vertical
 
-* Refresh on on window resize - 300ms of no change
+* Refresh elements on window resize events - 300ms of no change
 * Batch DOM lookup when adding more elements - 500ms of no change
 
 ## 1.1.0
