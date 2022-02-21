@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.0.1
+* Bump to create new tag in an attempt to fix #5
+
 ## 2.0.0
 * Pass `Msg -> msg` function to every that returns a `Msg`
 * Add Viewport

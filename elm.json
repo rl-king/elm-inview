@@ -3,7 +3,7 @@
     "name": "rl-king/elm-inview",
     "summary": "Get information on an element position relative to the current viewport",
     "license": "BSD-3-Clause",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "exposed-modules": [
         "InView"
     ],
